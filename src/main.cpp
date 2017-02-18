@@ -8,9 +8,7 @@ using namespace std;
 int main(int argc, char const *argv[]) {
   HuffmanZipper zipper;
   zipper.setFrequency(argv[1]);
-  HuffmanTree tree(zipper.frequency);
-  tree.buildTree();
-  tree.travelTree();
-  //tree.showReflect();
+  zipper.compress(argv[1], "helloworld.txt");
+  zipper.decompress("helloworld.txt");
   return 0;
 }

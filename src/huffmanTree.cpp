@@ -233,9 +233,7 @@ void HuffmanTree::travelTree() {
 }
 
 ReflectionType HuffmanTree::getReflection() {
-  this->buildTree();
-  this->travelTree();
-  return this->reflect;
+    return this->reflect;
 }
 
 void HuffmanTree::showReflect() {
