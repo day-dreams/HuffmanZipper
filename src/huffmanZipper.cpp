@@ -85,80 +85,165 @@ bool HuffmanZipper::compress(std::string input_filename,
   // 2.写入源文件，每次读取一个字节,写入文件
   std::ifstream input;
   input.open(input_filename, std::fstream::binary);
-  char c;
-  int left = -1; // left 指向上一个遗留bit
-  char left_code = 0, current_code = 0;
-  long long int current_size = 0;
+  char c, code = 0;
+  int left = 0;
+  bool jump_flag = false;
   while (!input.eof()) {
-    bool flag = true;
     input.get(c);
-    std::cout << "current bit size:" << current_size++ << '\n';
     auto encode = reflection[c];
-    int current = 0;
-    if (left >= 0) {
-      //上次有遗留bit没写入
-      char _left_code = 0;
-      for (; current + left + 1 < 8; ++current) {
-        if (current >= encode.size()) { //本次写入结束，但仍然没有填满整个char
-          std::cout << "-------------------------------" << '\n';
-          left += encode.size();
-          flag = false;
+    std::cout << "get a char:" << std::setbase(16) << (unsigned short)(c)
+              << " encode:" << encode << '\n';
+    int current = 0;               //指向当前正要写入的bit
+    if (left != 0) {               //上次有遗留的bit没有写进去
+      while (current + left < 8) { //如果encode足够，补齐8bit后跳出
+        if (current == encode.length()) {
+          jump_flag = true;
+          left += current;
           break;
         }
-        _left_code << 1;
-        _left_code += encode[current] - '0';
-        std::cout << "encode :" << encode << " current:" << current
-                  << " in line:" << __LINE__ << " left:" << left << '\n';
+        // std::cout << " code:" << std::setbase(16) << (unsigned short)code
+        //           << " encode[current]:" << encode[current]
+        //           << " 7-left-current:" << (7 - left - current)
+        //           << "  encode[current]<<(7-left-current):"
+        //           << ((uint8_t)(encode[current] - '0') << (7 - left - current))
+        //           << '\n';
+        code += (encode[current] - '0') << (7 - left - current);
+        // std::cout << "_code:" << std::setbase(16) << (unsigned short)code
+        //           << " encode[current]:" << encode[current]
+        //           << " 7-left-current:" << (7 - left - current) << '\n';
+        current++;
       }
-      if (!flag)
+      if (jump_flag) {
+        std::cout << "jumping.." << '\n';
+        jump_flag = false;
         continue;
-      left_code += _left_code;
-      output.write(&left_code, 1);
-      std::cout << "writing: " << std::setbase(16) << (unsigned short)left_code
-                << "in line:" << __LINE__ << '\n';
-      left = -1;
-    }
-    //没有了遗留bit，开始新的bit,且只写入完整的char
-    for (; encode.size() - current >= 8;) { //剩下的bit > 8bit
-      std::cout << "encode " << encode << " current:" << current
-                << " in line:" << __LINE__ << '\n';
-      current_code = 0;
-      for (int i = 0; i != 8; ++i, ++current) {
-        current_code << 1;
-        current_code += encode[current] - '0';
-        std::cout << "encode " << encode << " current:" << current
-                  << " in line:" << __LINE__ << '\n';
       }
-      output.write(&current_code, 1);
-      std::cout << "writing: " << std::setbase(16)
-                << (unsigned short)current_code << "in line :" << __LINE__
-                << '\n';
-      std::cout << "encode " << encode << " current : " << current
-                << " in line:" << __LINE__ << '\n';
+      output.write(&code, 1);
+      left = 0;
+      // std::cout << "InLine:" << std::setbase(10) << __LINE__
+      //           << " writing: " << std::setbase(16) << (unsigned short)(c)
     }
-    //把剩下的bit写入left_code中，下次读入再写入
-    left_code = 0;
-    left = encode.length() - current;
-    for (int i = 0; i != 8; ++i) {
-      left_code << 1;
-      if (current < encode.length()) {
-        left_code += encode[current++] - '0';
-        std::cout << "encode " << encode << " current:" << current
-                  << " in line : " << __LINE__ << '\n';
+      //           << '\n';
+    //消除了遗留或者是没有遗留
+    while ((encode.length() - current) % 8 == 0 &&
+           (encode.length() != current)) { //可以直接写入整块的char
+      code = 0;
+      for (int i = 0; i != 8; ++i) {
+        code << 1;
+        // std::cout << "InLine:" << std::setbase(10) << __LINE__
+        //           << "code:" << std::setbase(16) << (unsigned short)code
+        //           << '\n';
+        code += (encode[current] - '0');
+        current++;
+        // std::cout << "_InLine:" << std::setbase(10) << __LINE__
+        //           << "code:" << std::setbase(16) << (unsigned short)code
+        //           << '\n';
       }
-      std::cout << "encode " << encode << " current:" << current
-                << " in line : " << __LINE__ << '\n';
+      output.write(&code, 1);
+      // std::cout << "InLine:" << std::setbase(10) << __LINE__
+      //           << " writing: " << std::setbase(16) << (unsigned short)(c)
+      //           << '\n';
+    }
+    if (current < encode.length()) { //仍然有遗留，把他们冲到code里
+      code = 0;
+      for (int i = 0; current < encode.length(); ++i) {
+        // std::cout << "InLine:" << std::setbase(10) << __LINE__
+        //           << "code:" << std::setbase(16) << (unsigned short)code
+        //           << '\n';
+        code += (encode[current] - '0') << (7 - i);
+        current++;
+        // std::cout << "_InLine:" << std::setbase(10) << __LINE__
+        //           << "code:" << std::setbase(16) << (unsigned short)code
+        //           << '\n';
+        ++left;
+      }
+      //遗留清理完毕，读取下一个字符
     }
   }
-  if (left >= 0) {
-    //文件bit不是8的整数倍;由于每次更新left_code都会置0 所以直接写入
-    output.write(&left_code, 1);
-    std::cout << "writing :" << std::setbase(16) << (unsigned short)left_code
-              << "in line:" << __LINE__ << '\n';
+  //可能还有多余的遗留，凑不够8bit,但是code已经经过了补0，所以直接写入
+  if (left != 0) {
+    output.write(&code, 1);
+    // std::cout << "InLine:" << std::setbase(10) << __LINE__
+    //           << " writing: " << std::setbase(16) << (unsigned short)(code)
+    //           << '\n';
   }
-  output.close();
-  input.close();
-  return true;
+
+  // char c;
+  // int left = -1; // left 指向上一个遗留bit
+  // char left_code = 0, current_code = 0;
+  // long long int current_size = 0;
+  // while (!input.eof()) {
+  //   bool flag = true;
+  //   input.get(c);
+  //   std::cout << "current bit size:" << current_size++ << '\n';
+  //   auto encode = reflection[c];
+  //   int current = 0;
+  //   if (left >= 0) {
+  //     //上次有遗留bit没写入
+  //     char _left_code = 0;
+  //     for (; current + left + 1 < 8; ++current) {
+  //       if (current >= encode.size()) {
+  //       //本次写入结束，但仍然没有填满整个char
+  //         std::cout << "-------------------------------" << '\n';
+  //         left += encode.size();
+  //         flag = false;
+  //         break;
+  //       }
+  //       _left_code << 1;
+  //       _left_code += encode[current] - '0';
+  //       std::cout << "encode :" << encode << " current:" << current
+  //                 << " in line:" << __LINE__ << " left:" << left << '\n';
+  //     }
+  //     if (!flag)
+  //       continue;
+  //     left_code += _left_code;
+  //     output.write(&left_code, 1);
+  //     std::cout << "writing: " << std::setbase(16) << (unsigned
+  //     short)left_code
+  //               << "in line:" << __LINE__ << '\n';
+  //     left = -1;
+  //   }
+  //   //没有了遗留bit，开始新的bit,且只写入完整的char
+  //   for (; encode.size() - current >= 8;) { //剩下的bit > 8bit
+  //     std::cout << "encode " << encode << " current:" << current
+  //               << " in line:" << __LINE__ << '\n';
+  //     current_code = 0;
+  //     for (int i = 0; i != 8; ++i, ++current) {
+  //       current_code << 1;
+  //       current_code += encode[current] - '0';
+  //       std::cout << "encode " << encode << " current:" << current
+  //                 << " in line:" << __LINE__ << '\n';
+  //     }
+  //     output.write(&current_code, 1);
+  //     std::cout << "writing: " << std::setbase(16)
+  //               << (unsigned short)current_code << "in line :" << __LINE__
+  //               << '\n';
+  //     std::cout << "encode " << encode << " current : " << current
+  //               << " in line:" << __LINE__ << '\n';
+  //   }
+  //   //把剩下的bit写入left_code中，下次读入再写入
+  //   left_code = 0;
+  //   left = encode.length() - current;
+  //   for (int i = 0; i != 8; ++i) {
+  //     left_code << 1;
+  //     if (current < encode.length()) {
+  //       left_code += encode[current++] - '0';
+  //       std::cout << "encode " << encode << " current:" << current
+  //                 << " in line : " << __LINE__ << '\n';
+  //     }
+  //     std::cout << "encode " << encode << " current:" << current
+  //               << " in line : " << __LINE__ << '\n';
+  //   }
+  // }
+  // if (left >= 0) {
+  //   //文件bit不是8的整数倍;由于每次更新left_code都会置0 所以直接写入
+  //   output.write(&left_code, 1);
+  //   std::cout << "writing :" << std::setbase(16) << (unsigned short)left_code
+  //             << "in line:" << __LINE__ << '\n';
+  // }
+  // output.close();
+  // input.close();
+  // return true;
 }
 
 bool HuffmanZipper::decompress(std::string input_filename) {
@@ -197,54 +282,9 @@ bool HuffmanZipper::decompress(std::string input_filename) {
   map<string, unsigned char> reflection;
   for (auto ite = x.begin(); ite != x.end(); ++ite)
     reflection[ite.key()] = ite.value();
-  for (auto &entry : reflection)
-    std::cout << entry.first << "  " << setbase(16)
-              << (unsigned int)entry.second << '\n';
+  // for (auto &entry : reflection)
+  //   std::cout << entry.first << "  " << setbase(16)
+  //             << (unsigned int)entry.second << '\n';
   // 3.解压源文件
   return true;
 }
-
-// if (encode.length() <= (8 - bit_index)) {
-//   //本次写入不会超过当前的char
-//   uint8_t code = 0;
-//   for (int i = 0; i != encode.length(); ++i) {
-//     code << 1;
-//     code += encode[i] - '0';
-//   }
-//   for (int i = 0; i != (8 - bit_index - encode.length()); ++i)
-//     code << 1;
-//   write_buffer[byte_index] += code;
-//   bit_index += encode.length();
-// } else {
-//   //本次写入会越界到后面的char，且可能越过不止一个
-//   //将字符串分为三份[0,a) [a,b) [b,c],分别
-//   //直接加到当前char、直接加到完整的后续char、加到后续的一个char(不完整)
-//   int a = 8 - bit_index;
-//   int b = (encode.length() - a) / 8 * 8 + a;
-//   int c = encode.length() - 1;
-//   uint8_t code = 0;
-//   for (int i = 0; i != a; ++i) {
-//     code << 1;
-//     code += encode[i] - '0';
-//   }
-//   write_buffer[byte_index++] += code; //[0,a)
-//   code = 0;
-//   for (int i = 0; i != (b - a); i += 8) {
-//     for (int j = 0; j != 8; ++j) {
-//       code << 1;
-//       code += encode[a + i + j] - '0';
-//     }
-//     write_buffer[byte_index++] += code; //[a,b)
-//     code = 0;
-//   }
-//   code = 0; // ensure
-//   for (int i = 0; i <= (c - b); ++i) {
-//     code << 1;
-//     code += encode[b + i];
-//   }
-//   for (int i = 0; i != (8 - c + b); ++i)
-//     code << 1;
-//   write_buffer[byte_index] += code; //[b,c]
-//   bit_index = c - b + 1;
-// }
-// //判断时候要把buffer写入
