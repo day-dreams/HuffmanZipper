@@ -22,5 +22,5 @@ public:
   bool compress(std::string input_filename, std::string output_filename);
 
   // 3.解压
-  bool decompress(std::string intput_filename);
+  bool decompress(std::string intput_filename,std::string output_filename);
 };
