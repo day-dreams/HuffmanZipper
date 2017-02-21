@@ -83,7 +83,7 @@ bool HuffmanZipper::compress(std::string input_filename,
 
   // 1.写入json串，明文
   output << json_str;
-  std::cout << "json during compress:" << json_str << '\n';
+  std::cout << "\njson during compress:" << json_str << '\n';
   // 2.写入源文件，每次读取一个字节,写入文件
   std::ifstream input;
   input.open(input_filename, std::fstream::binary);
@@ -125,14 +125,16 @@ bool HuffmanZipper::compress(std::string input_filename,
       left = 0;
       // std::cout << "InLine:" << std::setbase(10) << __LINE__
       //           << " writing: " << std::setbase(16) << (unsigned short)(c)
-    }
-    //           << '\n';
-    //消除了遗留或者是没有遗留
+      //           << " CODE:" << (unsigned short)(code) << '\n';
+    } //消除了遗留或者是没有遗留
     while ((encode.length() - current) % 8 == 0 &&
            (encode.length() != current)) { //可以直接写入整块的char
       code = 0;
       for (int i = 0; i != 8; ++i) {
-        code << 1;
+        // std::cout << "InLine:" << std::setbase(10) << __LINE__
+        //           << "code:" << std::setbase(16) << (unsigned short)code
+        //           << '\n';
+        code = code << 1;
         // std::cout << "InLine:" << std::setbase(10) << __LINE__
         //           << "code:" << std::setbase(16) << (unsigned short)code
         //           << '\n';
@@ -145,7 +147,7 @@ bool HuffmanZipper::compress(std::string input_filename,
       output.write(&code, 1);
       // std::cout << "InLine:" << std::setbase(10) << __LINE__
       //           << " writing: " << std::setbase(16) << (unsigned short)(c)
-      //           << '\n';
+      //           << " CODE:" << (unsigned short)(code) << '\n';
     }
     if (current < encode.length()) { //仍然有遗留，把他们冲到code里
       code = 0;
@@ -168,7 +170,7 @@ bool HuffmanZipper::compress(std::string input_filename,
     output.write(&code, 1);
     // std::cout << "InLine:" << std::setbase(10) << __LINE__
     //           << " writing: " << std::setbase(16) << (unsigned short)(code)
-    //           << '\n';
+    //           << " CODE:" << (unsigned short)(code) << '\n';
   }
 }
 
@@ -180,7 +182,7 @@ bool _polishing_zero(std::bitset<8> &bits, int index) {
     if (bits[i])
       return false;
   }
-  std::cout << "怎么没补齐？" << bits << " index:" << index << '\n';
+  // std::cout << "怎么没补齐？" << bits << " index:" << index << '\n';
   return true;
 }
 
@@ -217,7 +219,7 @@ bool HuffmanZipper::decompress(std::string input_filename,
   vector<char> json_buffer(json_size, 0);
   input.read(&json_buffer[0], json_size);
   auto x = nlohmann::json::parse(json_buffer);
-  std::cout << "json during compress:" << x << '\n';
+  std::cout << "\njson during decompress:" << x << '\n';
   map<string, unsigned char> reflection;
   for (auto ite = x.begin(); ite != x.end(); ++ite)
     reflection[ite.key()] = ite.value();
@@ -239,20 +241,21 @@ bool HuffmanZipper::decompress(std::string input_filename,
   while (input && !input.eof()) {
     c = char_buffer;
     input.get(char_buffer);
-    std::cout << "eof?" << input.eof() << '\n';
+    // std::cout << "eof?" << input.eof() << '\n';
     bits = bitset<8>(c);
     for (int i = 7; i >= 0; --i) {
       code.push_back(bits[i] ? '1' : '0');
       if (reflection.find(code) != reflection.end()) { //匹配成功
-        std::cout << "eof?:" << output.eof() << " bits:" << bits
-                  << " code:" << code << " i:" << i << '\n';
+        // std::cout << "eof?:" << output.eof() << " bits:" << bits
+        //           << " code:" << code << " raw char:" << reflection[code]
+        //           << " i:" << i << '\n';
         if (_polishing_zero(bits, i - 1) && input.eof()) { //补齐
-          std::cout << "polishing..." << '\n';
+          // std::cout << "polishing..." << '\n';
           c = reflection[code];
           output.write(&c, 1);
           return true;
         } else { //不是补齐，直接写入
-          std::cout << "not polishing..." << '\n';
+          // std::cout << "not polishing..." << '\n';
           c = reflection[code];
           output.write(&c, 1);
           code.clear();
@@ -283,38 +286,3 @@ bool HuffmanZipper::decompress(std::string input_filename,
 
   return true;
 }
-
-//
-// input.get(c);
-// bool flag = false;
-// while (input) {
-//   bits = bitset<8>(c);
-//   if (input.eof()) {
-//     flag = true;
-//   }
-//   for (int i = 7; i >= 0; --i) {
-//     code.push_back(bits[i] ? '1' : '0');
-//     if (reflection.find(code) != reflection.end()) {
-//       if (flag) { //最后一个字节，要排除补0的情况
-//         for (int j = 0; j != code.size(); ++j) {
-//           if (reflection.find(code.substr(0, j + 1)) == reflection.end() &&
-//               code.substr(j + 1) ==
-//                   string(code.size() - i, '0')) { //补0，只写入前面部分
-//             c = reflection[code.substr(0, j + 1)];
-//             output.write(&c, 1);
-//             return true;
-//           }
-//         }
-//         //消除了补0，直接写入最后的字节
-//         c = reflection[code];
-//         output.write(&c, 1);
-//         code.clear();
-//       } else { //直接匹配
-//         c = reflection[code];
-//         output.write(&c, 1);
-//         code.clear();
-//       }
-//     }
-//   }
-//   input.get(c);
-// }
