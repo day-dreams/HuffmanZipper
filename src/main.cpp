@@ -9,6 +9,8 @@ int main(int argc, char const *argv[]) {
   HuffmanZipper zipper;
   zipper.setFrequency(argv[1]);
   zipper.compress(argv[1], "helloworld.txt");
-  zipper.decompress("helloworld.txt", "backup.txt");
+  std::cout << "compress finished." << '\n';
+  zipper.decompress("helloworld.txt", "backup");
+  std::cout << "decompress finished." << '\n';
   return 0;
 }

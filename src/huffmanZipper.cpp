@@ -83,7 +83,7 @@ bool HuffmanZipper::compress(std::string input_filename,
 
   // 1.写入json串，明文
   output << json_str;
-  std::cout << "\njson during compress:" << json_str << '\n';
+  // std::cout << "\njson during compress:" << json_str << '\n';
   // 2.写入源文件，每次读取一个字节,写入文件
   std::ifstream input;
   input.open(input_filename, std::fstream::binary);
@@ -127,7 +127,9 @@ bool HuffmanZipper::compress(std::string input_filename,
       //           << " writing: " << std::setbase(16) << (unsigned short)(c)
       //           << " CODE:" << (unsigned short)(code) << '\n';
     } //消除了遗留或者是没有遗留
-    while ((encode.length() - current) % 8 == 0 &&
+    // while ((encode.length() - current) % 8 == 0 &&
+    //        (encode.length() != current)) { //可以直接写入整块的char
+    while ((encode.length() - current) > 8 &&
            (encode.length() != current)) { //可以直接写入整块的char
       code = 0;
       for (int i = 0; i != 8; ++i) {
@@ -219,7 +221,7 @@ bool HuffmanZipper::decompress(std::string input_filename,
   vector<char> json_buffer(json_size, 0);
   input.read(&json_buffer[0], json_size);
   auto x = nlohmann::json::parse(json_buffer);
-  std::cout << "\njson during decompress:" << x << '\n';
+  // std::cout << "\njson during decompress:" << x << '\n';
   map<string, unsigned char> reflection;
   for (auto ite = x.begin(); ite != x.end(); ++ite)
     reflection[ite.key()] = ite.value();
@@ -240,6 +242,8 @@ bool HuffmanZipper::decompress(std::string input_filename,
   input.get(char_buffer);
   while (input && !input.eof()) {
     c = char_buffer;
+    // cout << "decompress--got a char:" << setbase(16) << (unsigned short)c
+    //      << "\n";
     input.get(char_buffer);
     // std::cout << "eof?" << input.eof() << '\n';
     bits = bitset<8>(c);
@@ -247,8 +251,8 @@ bool HuffmanZipper::decompress(std::string input_filename,
       code.push_back(bits[i] ? '1' : '0');
       if (reflection.find(code) != reflection.end()) { //匹配成功
         // std::cout << "eof?:" << output.eof() << " bits:" << bits
-        //           << " code:" << code << " raw char:" << reflection[code]
-        //           << " i:" << i << '\n';
+        //           << " code:" << code << " raw char:" << setbase(16)
+        //           << (unsigned short)reflection[code] << " i:" << i << '\n';
         if (_polishing_zero(bits, i - 1) && input.eof()) { //补齐
           // std::cout << "polishing..." << '\n';
           c = reflection[code];
@@ -262,26 +266,6 @@ bool HuffmanZipper::decompress(std::string input_filename,
         }
       }
     }
-
-    // std::cout << "eof?:" << input.eof() << " got a char:" << bits << ' '
-    //           << setbase(16) << (unsigned short)(c) << '\n';
-    // for (int i = 7; i >= 0; --i) { //每次读入一个bit，都要解码一次
-    //   // std::cout << "bit[" << i << "]:" << bits[i] << '\n';
-    //   code.push_back(bits[i] ? '1' : '0');
-    //   // std::cout << code << '\n';
-    //   if (reflection.find(code) !=
-    //       reflection.end()) { //匹配成功,写入源码再刷新code
-    //     if (input.eof()) {//
-    //
-    //     } else {
-    //       std::cout << "match succeeded: " << code << " " << reflection[code]
-    //                 << '\n';
-    //       c = reflection[code];
-    //       output.write(&c, 1);
-    //       code.clear();
-    //     }
-    //   }
-    //}
   }
 
   return true;
